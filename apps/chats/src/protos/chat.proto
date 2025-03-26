@@ -1,0 +1,58 @@
+syntax  = "proto3";
+
+package chat;
+
+// ChatService handles chat messaging, both one-to-one and group chats.
+
+service ChatService {
+
+    // Send a message to a group or individual
+
+    rpc SendMessage (MessageRequest) returns (MessageResponse);
+
+    // Receive messages in real-time using bidirectional streaming
+    rpc ChatStream ( stream MessageRequest) returns ( stream MessageResponse);
+
+    rpc GetMessagesHistory (MessageHistoryRequest) returns (MessageHistoryResponse);
+}
+
+
+// Enum to represent the message status.
+
+enum MessageStatus {
+    SENT = 0;
+    DELIVERED = 1;
+    FAILED = 2;
+  }
+
+
+//Message Request structure for sending messages
+
+message MessageRequest {
+
+    string userId = 1;
+    optional string groupId = 2;
+    string content = 3;
+    string timestamp = 4; 
+
+}
+
+// Message Response structure for messages
+
+message MessageResponse{
+    string userId = 1;
+    string content = 2;
+    string timestamp = 3;
+    optional string error = 4;  
+    MessageStatus status = 5;
+}
+
+message MessageHistoryRequest {
+    string groupId = 1;
+    int32 limit = 2;
+
+}
+
+message MessageHistoryResponse {
+    repeated MessageResponse messages = 1;
+}
