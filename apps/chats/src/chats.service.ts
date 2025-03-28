@@ -8,6 +8,7 @@ import { RedisService } from './services/redis.service';
 import { catchError, from, mergeMap, Observable, of, Subject } from 'rxjs';
 import { ChatMessage } from './interfaces/chat-message.interface.';
 import { MessagesService } from 'apps/messages/src/messages.service';
+import { CachingService } from 'apps/caching/src/caching.service';
 
 @Injectable()
 export class ChatsService implements OnModuleInit, OnModuleDestroy {
@@ -19,9 +20,13 @@ export class ChatsService implements OnModuleInit, OnModuleDestroy {
 
   private destroy$ = new Subject<void>(); // For cleanup
 
+  // Cache TTL (5 Minutes)
+  private readonly MESSAGE_CACHE_TTL = 300;
+
   constructor(
     private readonly redisService: RedisService,
     private readonly messageService: MessagesService,
+    private readonly cachingService: CachingService,
   ) {}
 
   /**
@@ -37,6 +42,15 @@ export class ChatsService implements OnModuleInit, OnModuleDestroy {
           const message = this.parseMessage(msg);
           // Push the parsed message to the stream
           this.messageStream.next(message);
+
+          // Cache real-time messages temporarily
+
+          const cacheKey = `chat:message:${message.groupId}`;
+          void this.cachingService.set(
+            cacheKey,
+            message,
+            this.MESSAGE_CACHE_TTL,
+          );
         } catch (error) {
           this.logger.error(error, 'Failed to parse incoming message');
         }
@@ -54,21 +68,17 @@ export class ChatsService implements OnModuleInit, OnModuleDestroy {
     this.logger.log('Cleaning up chat service...');
 
     // Complete the destroy$ subject to trigger takeUntil
-
     this.destroy$.next();
     this.destroy$.complete();
-
     // Complete the message stream
-
     this.messageStream.complete();
-
     //Clean up Redis connections (assuming RedisService implements OnModuleDestroy)
-
     await this.redisService.onModuleDestroy();
   }
 
-  // Handles incoming messages, enriches them with a timestamp, and publishes them to Redis.
-
+  /**
+   * Handles incoming messages, enriches them with a timestamp, and publishes them to Redis.
+   */
   async handleMessage(message: ChatMessage): Promise<ChatMessage> {
     try {
       // Append a timestamp to the message for tracking
@@ -83,6 +93,16 @@ export class ChatsService implements OnModuleInit, OnModuleDestroy {
         message.userId,
         message.groupId ?? '',
         message.content,
+      );
+
+      //Cache the message
+
+      const cacheKey = `chat:message:${message.groupId}`;
+
+      await this.cachingService.set(
+        cacheKey,
+        enrichedMessage,
+        this.MESSAGE_CACHE_TTL,
       );
 
       // Publish the enriched message to the Redis channel
@@ -102,9 +122,10 @@ export class ChatsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  // Handles a stream of chat messages using RxJS operators.
-  // ( data$ ) Observable stream of ChatMessage objects.
-
+  /**
+   * Handles a stream of chat messages using RxJS operators.
+   * ( data$ ) Observable stream of ChatMessage objects.
+   */
   handleMessageStream(data$: Observable<ChatMessage>): Observable<ChatMessage> {
     data$
       .pipe(
@@ -131,8 +152,28 @@ export class ChatsService implements OnModuleInit, OnModuleDestroy {
     return this.messageStream.asObservable();
   }
 
+  /**
+   * Retrieve Message History with Caching
+   */
+
   async getMessageHistory(groupId: string, limit: number) {
-    return await this.messageService.getMessageHistory(groupId, limit);
+    const cacheKey = `chat:history:${groupId}:${limit}`;
+
+    //Check cache for the messages
+
+    const cachedMessages = await this.cachingService.get(cacheKey);
+    if (cachedMessages) {
+      this.logger.log(`Cache hit for group ${groupId}`);
+      return cachedMessages;
+    }
+
+    // Fetch from the Database if cache is empty
+    const messages =
+      (await this.messageService.getMessageHistory(groupId, limit)) || [];
+
+    await this.cachingService.set(cacheKey, messages, this.MESSAGE_CACHE_TTL);
+
+    return messages;
   }
 
   //Parses a JSON string into a ChatMessage object

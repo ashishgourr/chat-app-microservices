@@ -5,6 +5,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 
 import { Message, MessageSchema } from './schemas/message.schema';
 import { TerminusModule } from '@nestjs/terminus';
+import { CachingModule } from 'apps/caching/src/caching.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { TerminusModule } from '@nestjs/terminus';
       retryDelay: 1000,
     }),
     TerminusModule,
+    CachingModule,
     MongooseModule.forFeature([
       {
         name: Message.name,

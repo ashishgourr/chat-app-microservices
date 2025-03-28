@@ -2,14 +2,18 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Message } from './schemas/message.schema';
 import { DeleteResult, Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
+import { CachingService } from 'apps/caching/src/caching.service';
 
 @Injectable()
 export class MessagesService {
   // Logger instance to log errors
   private readonly logger = new Logger(MessagesService.name);
 
+  private readonly MESSAGE_CACHE_TTL = 300; // 5 minutes
+
   constructor(
     @InjectModel(Message.name) private messageModel: Model<Message>,
+    private readonly cachingService: CachingService,
   ) {}
 
   /**
@@ -30,6 +34,10 @@ export class MessagesService {
 
       const savedMessage = await message.save();
       this.logger.log(`Message saved successfully for group: ${groupId}`);
+
+      // Invalidate cache on message creation
+      const cacheKey = `chat:history:${groupId}`;
+      await this.cachingService.delete(cacheKey);
 
       return savedMessage;
     } catch (error) {
@@ -52,11 +60,27 @@ export class MessagesService {
    */
   async getMessageHistory(groupId: string, limit = 100) {
     try {
+      const cacheKey = `chat:history:${groupId}:${limit}`;
+
+      // Check cache for recent messages
+      const cachedMessages = await this.cachingService.get(cacheKey);
+      if (cachedMessages) {
+        this.logger.log(`Cache hit for group: ${groupId}`);
+        return cachedMessages;
+      }
       const messages = await this.messageModel
         .find({ groupId })
         .sort({ timestamp: -1 })
         .limit(limit)
         .exec();
+
+      if (messages.length > 0) {
+        await this.cachingService.set(
+          cacheKey,
+          messages,
+          this.MESSAGE_CACHE_TTL,
+        );
+      }
 
       this.logger.log(
         `Retrieved ${messages.length} messages for group: ${groupId}`,
@@ -92,6 +116,7 @@ export class MessagesService {
         this.logger.log(
           `Deleted ${result.deletedCount} messages for group: ${groupId}`,
         );
+        await this.cachingService.delete(`chat:history:${groupId}`);
       }
 
       return result;
