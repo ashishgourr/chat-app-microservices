@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  Logger,
   Param,
   Patch,
   Post,
@@ -22,11 +23,13 @@ import { GroupRole } from './enums/group-role.enum';
 @Controller('groups')
 @UseGuards(JwtAuthGuard) // Applies to all routes
 export class GroupsController {
+  private readonly logger = new Logger(GroupsController.name);
   constructor(private readonly groupsService: GroupsService) {}
 
   @Post()
   createGroup(@Req() req: RequestWithUser, @Body() dto: CreateGroupDto) {
-    return this.groupsService.createGroup(req.user.id, dto);
+    this.logger.log(`Request User: ${JSON.stringify(req.user)}`);
+    return this.groupsService.createGroup(req.user.userId, dto);
   }
 
   @Post(':groupId/members')
@@ -37,7 +40,7 @@ export class GroupsController {
     @Param('groupId') groupId: string,
     @Body() dto: AddMemberToGroupDto,
   ) {
-    return this.groupsService.addMemberToGroup(req.user.id, {
+    return this.groupsService.addMemberToGroup(req.user.userId, {
       ...dto,
       groupId,
     });
@@ -52,7 +55,7 @@ export class GroupsController {
     @Param('userId') userId: string,
   ) {
     return this.groupsService.removeMemberFromGroup(
-      req.user.id,
+      req.user.userId,
       groupId,
       userId,
     );
@@ -67,7 +70,7 @@ export class GroupsController {
     @Param('userId') userId: string,
     dto: UpdateMemberRoleDto,
   ) {
-    return this.groupsService.updateMemberRole(req.user.id, {
+    return this.groupsService.updateMemberRole(req.user.userId, {
       ...dto,
       groupId,
       userId,
@@ -78,6 +81,6 @@ export class GroupsController {
   @UseGuards(GroupRolesGuard)
   @GroupRoles(GroupRole.ADMIN) // Only admins can delete groups
   deleteGroup(@Req() req: RequestWithUser, @Param('groupId') groupId: string) {
-    return this.groupsService.deleteGroup(req.user.id, groupId);
+    return this.groupsService.deleteGroup(req.user.userId, groupId);
   }
 }

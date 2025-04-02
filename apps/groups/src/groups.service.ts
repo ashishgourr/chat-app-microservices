@@ -36,10 +36,14 @@ export class GroupsService {
     createGroupDto: CreateGroupDto,
   ): Promise<Group> {
     try {
+      this.logger.log(`Creating group with userId: ${userId}`);
+
       const group = this.groupRepository.create({
         name: createGroupDto.name,
         createdBy: userId,
       });
+
+      this.logger.log(`Group object before save: ${JSON.stringify(group)}`);
 
       await this.groupRepository.save(group);
 

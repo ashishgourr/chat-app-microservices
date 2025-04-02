@@ -8,7 +8,7 @@ import {
   BeforeInsert,
 } from 'typeorm';
 
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { UserRole } from '../enums/user-role.enum';
 
 @Entity()

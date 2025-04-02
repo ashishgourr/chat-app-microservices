@@ -62,7 +62,7 @@ export class GroupRolesGuard implements CanActivate {
        */
       const request = context.switchToHttp().getRequest<RequestWithUser>();
       const { groupId } = request.params; // Group ID from URL params
-      const userId = request.user.id; // User ID from decoded JWT token
+      const userId = request.user.userId; // User ID from decoded JWT token
 
       // Ensure the groupId is provided, otherwise throw an error
       if (!groupId) {

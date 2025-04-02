@@ -7,7 +7,7 @@ import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { SignupDto } from './dtos/signup.dto';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dtos/login.dto';
 import { User } from './entities/user.entity';
@@ -111,8 +111,19 @@ export class UsersService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    console.log(user.password.trim());
+
+    const newHash = await bcrypt.hash(password, 10);
+    console.log('New Hash:', newHash);
+    console.log('Compare:', await bcrypt.compare(password, newHash));
+
     // Validate the password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await bcrypt.compare(
+      password.trim(),
+      user.password.trim(),
+    );
+
+    console.log(isPasswordValid);
     if (!isPasswordValid) {
       await this.cachingService.set(
         attemptsKey,

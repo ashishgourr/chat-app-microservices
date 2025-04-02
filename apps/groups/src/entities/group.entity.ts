@@ -16,7 +16,7 @@ export class Group {
   name: string;
 
   // User ID of creator
-  @Column()
+  @Column({ type: 'uuid' })
   createdBy: string;
 
   @CreateDateColumn()

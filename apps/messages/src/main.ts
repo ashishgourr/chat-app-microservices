@@ -3,6 +3,6 @@ import { MessagesModule } from './messages.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(MessagesModule);
-  await app.listen(process.env.port ?? 3001);
+  await app.listen(process.env.port ?? 3003);
 }
 void bootstrap();
